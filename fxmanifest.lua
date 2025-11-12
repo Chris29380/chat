@@ -4,6 +4,7 @@ game 'gta5'
 author 'CDT'
 description 'CDT Custom Chat System - Override for chat with /me, /do, /annonce commands'
 version '1.0.0'
+contact 'ChrisToF#0851'
 
 dependencies { 'oxmysql' }
 
