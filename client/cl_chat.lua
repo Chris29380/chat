@@ -273,14 +273,24 @@ end)
 RegisterNUICallback('getPlayersForAnnounce', function(data, cb)
     local players = {}
     local success, playerList = pcall(GetPlayers)
+    print('[getPlayersForAnnounce] success:', success, 'playerList:', playerList, 'type:', type(playerList))
     if success and playerList then
+        print('[getPlayersForAnnounce] Players found:', #playerList)
         for _, id in ipairs(playerList) do
-            table.insert(players, {
-                id = tonumber(id),
-                name = GetPlayerName(tonumber(id))
-            })
+            local playerId = tonumber(id)
+            local playerName = GetPlayerName(playerId)
+            print('[getPlayersForAnnounce] Player:', playerId, 'Name:', playerName)
+            if playerName then
+                table.insert(players, {
+                    id = playerId,
+                    name = playerName
+                })
+            end
         end
+    else
+        print('[getPlayersForAnnounce] GetPlayers() failed or returned nil')
     end
+    print('[getPlayersForAnnounce] Returning players:', #players, 'players')
     cb(players)
 end)
 

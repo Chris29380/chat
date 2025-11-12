@@ -309,10 +309,22 @@ body {
 }
 
 #announce-section {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 4px;
-    padding: 10px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: rgba(0, 0, 0, 0.95);
+    border: 2px solid #ff6b35;
+    border-radius: 8px;
+    padding: 20px;
+    z-index: 3000;
+    box-shadow: 0 0 30px rgba(255, 107, 53, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.5);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .announce-header {
@@ -1268,8 +1280,9 @@ body {
     flex-direction: column;
     gap: 12px;
     margin-bottom: 10px;
-    max-height: 300px;
+    max-height: calc(90vh - 200px);
     overflow-y: auto;
+    flex: 1;
 }
 
 .announce-row {

@@ -1345,19 +1345,26 @@ doBtn.addEventListener('click', () => {
 });
 
 announceBtn.addEventListener('click', () => {
+    console.log('[announceBtn] Clicked, fetching players...');
     fetch(`https://chat/getPlayersForAnnounce`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({})
-    }).then(response => response.json())
+    }).then(response => {
+        console.log('[announceBtn] Response status:', response.status);
+        return response.json();
+    })
       .then(data => {
-          const playersList = (data && data.data) || data || [];
-          allPlayers = Array.isArray(playersList) ? playersList : [];
+          console.log('[announceBtn] Received data:', data, 'type:', typeof data);
+          const playersList = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+          allPlayers = playersList;
+          console.log('[announceBtn] allPlayers count:', allPlayers.length);
           if (announcePlayerSelect) {
               announcePlayerSelect.innerHTML = '<option value="" selected>' + t('announce.selectPlayer') + '</option>';
               allPlayers.forEach(player => {
+                  console.log('[announceBtn] Adding player:', player.name, 'ID:', player.id);
                   const option = document.createElement('option');
                   option.value = player.id;
                   option.textContent = `${player.name} (ID: ${player.id})`;
@@ -1367,7 +1374,7 @@ announceBtn.addEventListener('click', () => {
           openAnnounceModal();
       })
       .catch(error => {
-          console.error('Failed to fetch players:', error);
+          console.error('[announceBtn] Failed to fetch players:', error);
           allPlayers = [];
           if (announcePlayerSelect) {
               announcePlayerSelect.innerHTML = '<option value="" selected>' + t('announce.selectPlayer') + '</option>';
