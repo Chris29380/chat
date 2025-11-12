@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDT Chat</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="messages-zone" class="chat-zone">
+        <div id="messages-header">
+            <span>Chat</span>
+            <button id="toggle-messages-btn" class="toggle-btn" title="Masquer/Afficher les retours">−</button>
+        </div>
+        <div id="chat-messages"></div>
+        <div id="messages-edit-controls" class="zone-edit-controls" style="display: none;">
+            <div class="edit-control">
+                <label>
+                    <input type="checkbox" id="messages-auto-show" checked>
+                    Afficher automatiquement
+                </label>
+            </div>
+            <div class="edit-control" id="server-print-control" style="display: none;">
+                <label>
+                    <input type="checkbox" id="messages-server-print">
+                    Afficher les messages serveur
+                </label>
+            </div>
+            <div class="edit-control">
+                <label>Couleur:</label>
+                <input type="color" id="messages-edit-color" value="#00d4ff">
+            </div>
+            <div class="edit-control">
+                <label>Transparence: <span id="messages-edit-opacity-value">35</span>%</label>
+                <input type="range" id="messages-edit-opacity" min="0" max="100" value="35">
+            </div>
+            <div class="edit-control">
+                <label>Police:</label>
+                <select id="messages-edit-font">
+                    <option value="Segoe UI">Segoe UI</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Courier New">Courier New</option>
+                    <option value="Verdana">Verdana</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                </select>
+            </div>
+            <div class="edit-control">
+                <label>Taille: <span id="messages-edit-font-size-value">12</span>px</label>
+                <input type="range" id="messages-edit-font-size" min="8" max="20" value="12">
+            </div>
+            <div class="edit-buttons">
+                <button id="messages-edit-reset" class="btn-cancel" title="Restaurer les valeurs par défaut">Réinitialiser</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="chat-container" class="chat-zone">
+        <div id="buttons-container">
+            <button id="me-btn" class="chat-btn" title="Utiliser /me">
+                <span class="btn-icon">/me</span>
+            </button>
+            <button id="do-btn" class="chat-btn" title="Utiliser /do">
+                <span class="btn-icon">/do</span>
+            </button>
+            <button id="announce-btn" class="chat-btn announce-btn" style="display: none;" title="Créer une annonce">
+                <span class="btn-icon">/annonce</span>
+            </button>
+            <button id="edit-mode-btn" class="chat-btn" title="Mode édition" style="margin-left: auto;">
+                <span class="btn-icon">⚙️</span>
+            </button>
+        </div>
+        
+        <div id="chat-input-container" style="display: none;">
+            <input type="text" id="chat-input" placeholder="Tapez votre message..." autocomplete="off">
+            <button id="send-btn">Envoyer</button>
+        </div>
+        
+        <div id="suggestions-container" style="display: none;">
+            <div id="suggestions-list"></div>
+        </div>
+        
+        <div id="announce-section" style="display: none; flex-direction: column; gap: 8px;">
+            <div class="announce-header">
+                <h3 id="announce-title" style="margin: 0;">Créer une annonce</h3>
+                <button id="announce-close-btn" class="announce-close-btn">✕</button>
+            </div>
+            
+            <div class="announce-form" style="overflow-y: auto; max-height: 400px; padding-right: 5px;">
+                <div class="announce-row">
+                    <div class="announce-field">
+                        <label id="announce-importance-label" style="display: block; margin-bottom: 6px;">Niveau d'importance:</label>
+                        <div class="announce-importance-grid">
+                            <button class="announce-importance-btn" data-importance="info" data-icon="ℹ️">ℹ️ Info</button>
+                            <button class="announce-importance-btn" data-importance="success" data-icon="✅">✅ Succès</button>
+                            <button class="announce-importance-btn" data-importance="warning" data-icon="⚠️">⚠️ Attention</button>
+                            <button class="announce-importance-btn" data-importance="error" data-icon="❌">❌ Erreur</button>
+                            <button class="announce-importance-btn" data-importance="critical" data-icon="🔴">🔴 Critique</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="announce-row">
+                    <div class="announce-field">
+                        <label id="announce-target-label" style="display: block; margin-bottom: 6px;">Ciblage:</label>
+                        <div class="announce-target-group">
+                            <label class="announce-radio-label">
+                                <input type="radio" name="announce-target" value="all" checked>
+                                <span id="announce-target-all">Tous les joueurs</span>
+                            </label>
+                            <label class="announce-radio-label">
+                                <input type="radio" name="announce-target" value="specific">
+                                <span id="announce-target-specific">Joueur spécifique</span>
+                            </label>
+                        </div>
+                        <div id="announce-player-search-container" style="display: none; margin-top: 4px;">
+                            <input type="text" id="announce-player-search" placeholder="Rechercher par ID ou nom..." style="width: 100%; padding: 8px; margin-bottom: 4px; border: 1px solid #ff6b35; border-radius: 4px; background: rgba(0, 0, 0, 0.4); color: #fff;">
+                            <div id="announce-player-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ff6b35; border-radius: 4px; background: rgba(0, 0, 0, 0.3);"></div>
+                        </div>
+                        <select id="announce-player-select" style="display: none; margin-top: 4px; width: 100%; padding: 4px;">
+                            <option value="" selected id="announce-player-placeholder">Sélectionnez un joueur...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="announce-row">
+                    <div class="announce-field">
+                        <label id="announce-duration-label" style="display: block; margin-bottom: 4px;">Durée (s):</label>
+                        <input type="number" id="announce-duration" min="1" max="300" value="5" class="announce-input" style="width: 100%; padding: 4px;">
+                    </div>
+                </div>
+                
+                <div class="announce-row">
+                    <div class="announce-field full-width">
+                        <label id="announce-message-label" style="display: block; margin-bottom: 4px;">Message:</label>
+                        <textarea id="announce-textarea" placeholder="Votre annonce..." class="announce-textarea" style="width: 100%; min-height: 60px; padding: 4px; resize: vertical;"></textarea>
+                        <div class="announce-char-count" style="font-size: 11px; color: #888; margin-top: 2px;">
+                            <span id="announce-char-count">0</span> / 500
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="announce-buttons" style="display: flex; gap: 6px; margin-top: auto;">
+                <button id="announce-send" class="btn-confirm" style="flex: 1; padding: 6px;">Envoyer</button>
+                <button id="announce-cancel" class="btn-cancel" style="flex: 1; padding: 6px;">Annuler</button>
+            </div>
+        </div>
+        
+        <div id="chat-edit-controls" class="zone-edit-controls" style="display: none;">
+            <div class="edit-control">
+                <label>
+                    <input type="checkbox" id="chat-show-messages-zone" checked>
+                    Afficher la zone de messages
+                </label>
+            </div>
+            <div class="edit-control">
+                <label>Couleur:</label>
+                <input type="color" id="chat-edit-color" value="#00d4ff">
+            </div>
+            <div class="edit-control">
+                <label>Transparence: <span id="chat-edit-opacity-value">35</span>%</label>
+                <input type="range" id="chat-edit-opacity" min="0" max="100" value="35">
+            </div>
+            <div class="edit-control">
+                <label>Langue:</label>
+                <select id="chat-language-select">
+                    <option value="fr">Français</option>
+                    <option value="en">English</option>
+                    <option value="de">Deutsch</option>
+                    <option value="es">Español</option>
+                    <option value="pt">Português</option>
+                </select>
+            </div>
+            <div class="edit-buttons">
+                <button id="chat-edit-reset" class="btn-cancel" title="Restaurer les valeurs par défaut">Réinitialiser</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="texts-container"></div>
+    
+    <div id="admin-panel" style="display: none;">
+        <div class="admin-content">
+            <div class="admin-header">
+                <h3>Historique du chat - <span id="admin-player-name"></span></h3>
+                <button id="admin-close" class="admin-close-btn">✕</button>
+            </div>
+            <div id="admin-history" class="admin-history"></div>
+            <div class="admin-controls">
+                <div class="admin-control-group">
+                    <input type="number" id="mute-duration" placeholder="Durée (minutes)" min="1" max="1440" value="30">
+                    <input type="text" id="mute-reason" placeholder="Raison du mute">
+                    <button id="admin-mute-btn" class="btn-mute">Mute</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="admin-panel-players">
+        <div class="admin-players-content">
+            <div class="admin-players-header">
+                <h3>Chat - Panneau d'Administration</h3>
+                <button id="admin-players-close" class="admin-close-btn">✕</button>
+            </div>
+            <div class="admin-search-bar">
+                <input type="text" id="admin-search-input" placeholder="Rechercher par ID ou nom...">
+                <div class="admin-filters">
+                    <button id="filter-all" class="filter-btn active">Tous</button>
+                    <button id="filter-muted" class="filter-btn">Muets</button>
+                    <button id="filter-unmuted" class="filter-btn">Non muets</button>
+                    <button id="admin-refresh-btn" class="refresh-btn" title="Rafraîchir les données">🔄</button>
+                </div>
+            </div>
+            <div class="admin-players-container">
+                <div id="admin-players-list" class="admin-players-list"></div>
+                <div id="admin-selected-player" class="admin-selected-player">
+                    <div class="player-info">
+                        <h4 id="selected-player-name">Sélectionnez un joueur</h4>
+                        <p id="selected-player-id"></p>
+                    </div>
+                    <div id="admin-message" class="admin-message-notification" style="display: none;"></div>
+                    <div class="admin-player-controls">
+                        <input type="number" id="admin-mute-duration" placeholder="Durée (minutes)" min="1" max="1440" value="30">
+                        <input type="text" id="admin-mute-reason" placeholder="Raison du mute">
+                        <button id="admin-player-mute-btn" class="btn-mute">Mute</button>
+                    </div>
+                    <div id="admin-player-history" class="admin-player-history"></div>
+                </div>
+            </div>
+            <div class="admin-footer">
+                Chat FiveM - Développé par CdtFivem - www.cdtfivem.com
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/locales.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
