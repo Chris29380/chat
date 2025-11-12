@@ -1403,7 +1403,8 @@ chatInput.addEventListener('keydown', (e) => {
 });
 
 chatContainer.addEventListener('keydown', (e) => {
-    if (e.key === 't' && chatVisible && chatMode === 'toggle' && !focusInInput) {
+    const isAnnounceModalOpen = announceSection.style.display === 'flex';
+    if (e.key === 't' && chatVisible && chatMode === 'toggle' && !focusInInput && !isAnnounceModalOpen) {
         e.preventDefault();
         closeChatInput();
     }

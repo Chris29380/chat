@@ -339,6 +339,7 @@ body {
 .announce-header h3 {
     color: #ff6b35;
     font-size: 14px;
+    text-align: left;
 }
 
 .announce-close-btn {
@@ -1257,6 +1258,7 @@ body {
     color: #ff6b35;
     font-size: 18px;
     font-weight: bold;
+    text-align: left;
 }
 
 .announce-close-btn {
