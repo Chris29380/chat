@@ -28,10 +28,9 @@ end)
 RegisterServerEvent('cdtChat:meCommand')
 AddEventHandler('cdtChat:meCommand', function(message)
     local source = source
-    local playerName = GetPlayerName(source)
-    local text = '* ' .. playerName .. ' ' .. message .. ' *'
+    local text = '* ' .. message .. ' *'
     TriggerClientEvent('cdtChat:showMe', -1, text, source)
-    TriggerClientEvent('cdtChat:showCommandResult', source, '[ME] ' .. text)
+    TriggerClientEvent('cdtChat:showCommandResult', source, '[ME] * ' .. message .. ' *')
 end)
 
 RegisterServerEvent('cdtChat:doCommand')
@@ -45,10 +44,12 @@ end)
 RegisterServerEvent('cdtChat:announceCommand')
 AddEventHandler('cdtChat:announceCommand', function(message)
     local source = source
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
     
     if not IsPlayerAceAllowed(source, Config.Permissions.announcementCommand) then
         TriggerClientEvent('chat:addMessage', source, {
-            args = {'SYSTEM', 'Vous n\'avez pas la permission d\'utiliser cette commande.'}
+            args = {'SYSTEM', msgs.PermissionDenied}
         })
         return
     end
@@ -68,7 +69,7 @@ AddEventHandler('cdtChat:submitAdvancedAnnounce', function(data)
     
     if not IsPlayerAceAllowed(source, Config.Permissions.announcementCommand) then
         TriggerClientEvent('chat:addMessage', source, {
-            args = {'SYSTEM', 'Vous n\'avez pas la permission d\'utiliser cette commande.'}
+            args = {'SYSTEM', msgs.PermissionDenied}
         })
         return
     end
@@ -85,7 +86,7 @@ AddEventHandler('cdtChat:submitAdvancedAnnounce', function(data)
             bold = fmt.bold == true,
             italic = fmt.italic == true,
             underline = fmt.underline == true,
-            color = tostring(fmt.color or '#ffffff')
+            color = tostring(fmt.color or Config.Announcement.DefaultFormatting.color)
         }
     }
     
@@ -103,7 +104,7 @@ AddEventHandler('cdtChat:submitAdvancedAnnounce', function(data)
     end
     
     TriggerClientEvent('chat:addMessage', source, {
-        args = {'SYSTEM', 'Annonce envoyée avec succès.'}
+        args = {'SYSTEM', msgs.AnnouncementSent}
     })
 end)
 
@@ -116,12 +117,14 @@ end
 RegisterServerEvent('cdtChat:commandExecuted')
 AddEventHandler('cdtChat:commandExecuted', function(command)
     local source = source
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
     local commandName = command:match('^/([^ ]+)')
     
     if commandName and commandHandlers[commandName] then
         commandHandlers[commandName](source, command)
     else
-        TriggerClientEvent('cdtChat:showCommandResult', source, '[EXÉCUTÉE] ' .. command)
+        TriggerClientEvent('cdtChat:showCommandResult', source, string.format(msgs.CommandExecuted, command))
     end
 end)
 
@@ -182,6 +185,17 @@ if GetResourceState('oxmysql') == 'started' then
                     UNIQUE KEY unique_player_zone (identifier, zone_id),
                     INDEX(identifier),
                     INDEX(zone_id)
+                )
+            ]],
+            [[
+                CREATE TABLE IF NOT EXISTS player_settings (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    identifier VARCHAR(100) UNIQUE,
+                    language VARCHAR(10) DEFAULT 'fr',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    INDEX(identifier),
+                    INDEX(language)
                 )
             ]],
             [[
@@ -259,7 +273,7 @@ local function getPlayerHistory(playerId, limit, callback)
     if GetResourceState('oxmysql') == 'started' then
         print('^3[DB] Querying history for player ' .. playerId .. '^7')
         local result = exports.oxmysql:query_async('SELECT * FROM chat_history WHERE player_id = ? ORDER BY created_at DESC LIMIT ?', 
-            {playerId, limit or 100})
+            {playerId, limit or Config.Database.History.Limit})
         print('^3[DB] Got result for player ' .. playerId .. ' with ' .. (result and #result or 0) .. ' results^7')
         callback(result or {})
     else
@@ -272,7 +286,7 @@ local function getPlayerHistoryByIdentifier(identifier, limit, callback)
     if GetResourceState('oxmysql') == 'started' then
         print('^3[DB] Querying history for identifier ' .. identifier .. '^7')
         local result = exports.oxmysql:query_async('SELECT * FROM chat_history WHERE identifier = ? ORDER BY created_at DESC LIMIT ?', 
-            {identifier, limit or 100})
+            {identifier, limit or Config.Database.History.Limit})
         print('^3[DB] Got result for identifier ' .. identifier .. ' with ' .. (result and #result or 0) .. ' results^7')
         callback(result or {})
     else
@@ -290,6 +304,10 @@ AddEventHandler('cdtChat:checkMuteStatus', function()
 end)
 
 local function containsBlockedWord(message)
+    if not Config.BlockedWordsConfig.Enabled then
+        return false, nil
+    end
+    
     local messageCheck = message
     if not Config.BlockedWordsConfig.CaseSensitive then
         messageCheck = string.lower(message)
@@ -311,15 +329,17 @@ RegisterNetEvent('cdtChat:recordMessage')
 AddEventHandler('cdtChat:recordMessage', function(message)
     local source = source
     local playerName = GetPlayerName(source)
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
     
     local hasBlocked, blockedWord = containsBlockedWord(message)
     if hasBlocked then
-        local isAdmin = IsPlayerAceAllowed(source, 'chat.admin')
+        local isAdmin = IsPlayerAceAllowed(source, Config.Permissions.adminCommand)
         if not isAdmin then
-            mutePlayer(source, Config.BlockedWordsConfig.MuteDuration, 'Utilisation de mot/commande interdite: ' .. blockedWord, 'SYSTEM')
+            mutePlayer(source, Config.BlockedWordsConfig.MuteDuration, string.format(msgs.MuteReason, blockedWord), 'SYSTEM')
             TriggerClientEvent('cdtChat:playerMuted', source, Config.BlockedWordsConfig.MuteDuration)
             TriggerClientEvent('chat:addMessage', source, {
-                args = {'SYSTEM', 'Vous avez été mute pendant ' .. Config.BlockedWordsConfig.MuteDuration .. ' minutes pour tentative d\'utilisation de commande admin.'}
+                args = {'SYSTEM', string.format(msgs.AutoMuteMessage, Config.BlockedWordsConfig.MuteDuration)}
             })
             return
         end
@@ -329,16 +349,19 @@ AddEventHandler('cdtChat:recordMessage', function(message)
 end)
 
 RegisterCommand('mute', function(source, args, rawCommand)
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
+    
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         local targetId = tonumber(args[1])
-        local duration = tonumber(args[2]) or 30
+        local duration = tonumber(args[2]) or Config.Mute.DefaultDuration
         local reason = table.concat(args, ' ', 3) or 'No reason provided'
         
         if targetId then
             local adminName = GetPlayerName(source)
             mutePlayer(targetId, duration, reason, adminName)
             TriggerClientEvent('chat:addMessage', source, {
-                args = {'ADMIN', 'Joueur ' .. GetPlayerName(targetId) .. ' mute pour ' .. duration .. ' minutes'}
+                args = {'ADMIN', string.format(msgs.MuteAdminMessage, GetPlayerName(targetId), duration)}
             })
             TriggerClientEvent('cdtChat:playerMuted', targetId, duration)
         end
@@ -346,12 +369,15 @@ RegisterCommand('mute', function(source, args, rawCommand)
 end, false)
 
 RegisterCommand('unmute', function(source, args, rawCommand)
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
+    
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         local targetId = tonumber(args[1])
         if targetId then
             unmutePlayer(targetId)
             TriggerClientEvent('chat:addMessage', source, {
-                args = {'ADMIN', 'Joueur ' .. GetPlayerName(targetId) .. ' demute'}
+                args = {'ADMIN', string.format(msgs.UnmuteAdminMessage, GetPlayerName(targetId))}
             })
             TriggerClientEvent('cdtChat:playerUnmuted', targetId)
         end
@@ -359,10 +385,10 @@ RegisterCommand('unmute', function(source, args, rawCommand)
 end, false)
 
 RegisterCommand('chathistory', function(source, args, rawCommand)
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         local targetId = tonumber(args[1])
         if targetId then
-            getPlayerHistory(targetId, 50, function(history)
+            getPlayerHistory(targetId, Config.Database.AdminPanel.HistoryLimit, function(history)
                 TriggerClientEvent('cdtChat:showHistory', source, {
                     playerId = targetId,
                     playerName = GetPlayerName(targetId),
@@ -376,11 +402,14 @@ end, false)
 RegisterServerEvent('cdtChat:mutePlayerCommand')
 AddEventHandler('cdtChat:mutePlayerCommand', function(playerId, duration, reason)
     local source = source
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
+    
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         local adminName = GetPlayerName(source)
         mutePlayer(playerId, duration, reason, adminName)
         TriggerClientEvent('chat:addMessage', source, {
-            args = {'ADMIN', 'Joueur ' .. GetPlayerName(playerId) .. ' mute pour ' .. duration .. ' minutes'}
+            args = {'ADMIN', string.format(msgs.MuteAdminMessage, GetPlayerName(playerId), duration)}
         })
         TriggerClientEvent('cdtChat:playerMuted', playerId, duration)
     end
@@ -389,10 +418,13 @@ end)
 RegisterServerEvent('cdtChat:unmutePlayerCommand')
 AddEventHandler('cdtChat:unmutePlayerCommand', function(playerId)
     local source = source
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
+    
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         unmutePlayer(playerId)
         TriggerClientEvent('chat:addMessage', source, {
-            args = {'ADMIN', 'Joueur ' .. GetPlayerName(playerId) .. ' demute'}
+            args = {'ADMIN', string.format(msgs.UnmuteAdminMessage, GetPlayerName(playerId))}
         })
         TriggerClientEvent('cdtChat:playerUnmuted', playerId)
     end
@@ -425,7 +457,7 @@ local function sendAdminPanelData(source, players)
             player.identifier = identifier
             
             print('^3[Admin] Getting history for identifier ' .. identifier .. '^7')
-            getPlayerHistoryByIdentifier(identifier, 30, function(history)
+            getPlayerHistoryByIdentifier(identifier, Config.Database.AdminPanel.HistoryLimit, function(history)
                 print('^3[Admin] Got history for identifier ' .. identifier .. ' (' .. (history and #history or 0) .. ' messages)^7')
                 histories[identifier] = history or {}
                 
@@ -453,8 +485,11 @@ end
 RegisterNetEvent('cdtChat:openAdminPanelEvent')
 AddEventHandler('cdtChat:openAdminPanelEvent', function()
     local source = source
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
+    
     print('^3[Admin] Command received from player ' .. source .. '^7')
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         local players = {}
         for _, pid in ipairs(GetPlayers()) do
             local playerId = tonumber(pid)
@@ -469,7 +504,7 @@ AddEventHandler('cdtChat:openAdminPanelEvent', function()
     else
         print('^1[Admin] Access denied for ' .. source .. '^7')
         TriggerClientEvent('chat:addMessage', source, {
-            args = {'SYSTEM', 'Vous n\'avez pas les permissions pour utiliser cette commande.'}
+            args = {'SYSTEM', msgs.AdminPermissionDenied}
         })
     end
 end)
@@ -478,7 +513,7 @@ RegisterNetEvent('cdtChat:refreshAdminPanelData')
 AddEventHandler('cdtChat:refreshAdminPanelData', function()
     local source = source
     print('^3[Admin] Refresh request from player ' .. source .. '^7')
-    if IsPlayerAceAllowed(source, 'chat.admin') then
+    if IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
         local players = {}
         for _, pid in ipairs(GetPlayers()) do
             local playerId = tonumber(pid)
@@ -548,6 +583,35 @@ local function loadZoneSettings(identifier, zoneId, callback)
     end
 end
 
+local function savePlayerLanguage(identifier, language)
+    if GetResourceState('oxmysql') ~= 'started' then return end
+    
+    if not language or language == '' then
+        language = Config.Language.Default
+    end
+    
+    exports.oxmysql:query_async(
+        'INSERT INTO player_settings (identifier, language) VALUES (?, ?) ON DUPLICATE KEY UPDATE language = ?, updated_at = NOW()',
+        {identifier, language, language},
+        function() end
+    )
+end
+
+local function loadPlayerLanguage(identifier, callback)
+    if GetResourceState('oxmysql') ~= 'started' then
+        callback(Config.Language.Default)
+        return
+    end
+    
+    local result = exports.oxmysql:query_async('SELECT language FROM player_settings WHERE identifier = ?', {identifier})
+    
+    if result and #result > 0 and result[1].language then
+        callback(result[1].language)
+    else
+        callback(Config.Language.Default)
+    end
+end
+
 RegisterNetEvent('cdtChat:saveSettings')
 AddEventHandler('cdtChat:saveSettings', function(data)
     local source = source
@@ -568,4 +632,56 @@ AddEventHandler('cdtChat:loadSettings', function()
     loadZoneSettings(identifier, 'chat-container', function(settings)
         TriggerClientEvent('cdtChat:settingsLoaded', source, 'chat-container', settings)
     end)
+    loadPlayerLanguage(identifier, function(language)
+        TriggerClientEvent('cdtChat:languageLoaded', source, language)
+    end)
+end)
+
+RegisterNetEvent('cdtChat:saveLanguage')
+AddEventHandler('cdtChat:saveLanguage', function(language)
+    local source = source
+    local identifier = GetPlayerIdentifiers(source)[1] or 'unknown'
+    
+    if not language or language == '' then
+        language = Config.Language.Default
+    end
+    
+    for _, validLang in ipairs(Config.Language.Available) do
+        if validLang == language then
+            savePlayerLanguage(identifier, language)
+            break
+        end
+    end
+end)
+
+local function sendSystemMessageToAdmins(messageType, messageText, importance)
+    if not Config.SystemMessages.Enabled then
+        return
+    end
+    
+    local typeConfig = Config.SystemMessages.Types[messageType]
+    if not typeConfig then
+        return
+    end
+    
+    for _, playerId in ipairs(GetPlayers()) do
+        if IsPlayerAceAllowed(playerId, Config.Permissions.adminCommand) then
+            TriggerClientEvent('cdtChat:systemMessage', playerId, {
+                type = messageType,
+                text = messageText,
+                importance = importance or 'info',
+                timestamp = os.time()
+            })
+        end
+    end
+end
+
+RegisterNetEvent('cdtChat:toggleSystemMessages')
+AddEventHandler('cdtChat:toggleSystemMessages', function(enabled)
+    local source = source
+    if not IsPlayerAceAllowed(source, Config.Permissions.adminCommand) then
+        return
+    end
+    
+    TriggerClientEvent('cdtChat:updateSystemMessagesStatus', source, enabled)
 end)

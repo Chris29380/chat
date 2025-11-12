@@ -270,11 +270,15 @@ function addMessageToChat(message, isCommand = false) {
     
     const contentEl = document.createElement('span');
     contentEl.className = 'message-content' + (isCommand ? ' command' : '');
+    contentEl.style.whiteSpace = 'pre-wrap';
+    contentEl.style.wordBreak = 'break-word';
     
     const colorParts = parseColorCodes(message);
     colorParts.forEach(part => {
         const span = document.createElement('span');
         span.textContent = part.text;
+        span.style.whiteSpace = 'pre-wrap';
+        span.style.wordBreak = 'break-word';
         if (part.color) {
             span.style.color = part.color;
         }
@@ -1221,6 +1225,9 @@ window.addEventListener('message', (event) => {
             
         case CHAT_EVENTS.UPDATE_CONFIG:
             config = data.config;
+            if (data.config.Language) {
+                config.Language = data.config.Language;
+            }
             applyChatPosition(config.Position?.x || 0, config.Position?.y || 0);
             break;
             
@@ -1284,6 +1291,17 @@ window.addEventListener('message', (event) => {
                     showAuto: data.settings.showAuto !== undefined ? data.settings.showAuto : zoneSettings[data.zoneId].showAuto
                 };
                 applyZoneSettings(data.zoneId);
+            }
+            break;
+            
+        case 'LOAD_LANGUAGE':
+            if (data.language && config.Language && config.Language.Available.includes(data.language)) {
+                currentLanguage = data.language;
+                if (chatLanguageSelect) {
+                    chatLanguageSelect.value = data.language;
+                }
+                localStorage.setItem('chatLanguage', data.language);
+                updateInterfaceLanguage();
             }
             break;
     }
@@ -2216,6 +2234,12 @@ function changeLanguage(lang) {
         localStorage.setItem('chatLanguage', lang);
         updateInterfaceLanguage();
     }
+    
+    fetch(`https://chat/saveLanguage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: lang })
+    }).catch(error => console.error('Failed to save language preference:', error));
 }
 
 window.addEventListener('load', () => {

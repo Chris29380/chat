@@ -148,6 +148,8 @@ body {
 
 .message-content {
     color: #e0e0e0;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 .message-content.command {
@@ -325,35 +327,6 @@ body {
     display: none;
     flex-direction: column;
     gap: 8px;
-}
-
-.announce-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 107, 53, 0.3);
-}
-
-.announce-header h3 {
-    color: #ff6b35;
-    font-size: 14px;
-    text-align: left;
-}
-
-.announce-close-btn {
-    background: none;
-    border: none;
-    color: #ff6b35;
-    cursor: pointer;
-    font-size: 18px;
-    padding: 0 4px;
-    transition: all 0.2s ease;
-}
-
-.announce-close-btn:hover {
-    color: #ff7a4d;
 }
 
 #announce-textarea {

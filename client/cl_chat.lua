@@ -5,7 +5,7 @@ local showServerPrint = false
 local activeTexts = {}
 local textIdCounter = 0
 local lastCommandTime = 0
-local commandMessageTimeout = 500
+local commandMessageTimeout = Config.Chat.MessageTimeout
 local isMuted = false
 local muteTimeRemaining = 0
 
@@ -115,8 +115,8 @@ local function worldToScreen(worldX, worldY, worldZ)
         return nil, nil
     end
     
-    screenX = screenX * 1920
-    screenY = screenY * 1080
+    screenX = screenX * Config.ScreenCoordinates.BaseWidth
+    screenY = screenY * Config.ScreenCoordinates.BaseHeight
     
     return screenX, screenY
 end
@@ -127,6 +127,8 @@ local function showTextOnScreen(ped, text, duration, range, textType)
     
     local startTime = GetGameTimer()
     local endTime = startTime + duration
+    
+    local headOffset = (textType == 'me' and Config.MeCommand.HeadOffset or Config.DoCommand.HeadOffset) or 1.2
     
     activeTexts[textId] = true
     
@@ -140,7 +142,7 @@ local function showTextOnScreen(ped, text, duration, range, textType)
             local dist = #(playerPos - targetPos)
             
             if dist <= range then
-                local headPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 0.0, 1.2)
+                local headPos = GetOffsetFromEntityInWorldCoords(ped, 0.0, 0.0, headOffset)
                 local screenX, screenY = worldToScreen(headPos.x, headPos.y, headPos.z)
                 
                 if screenX and screenY then
@@ -323,7 +325,11 @@ RegisterNUICallback('loaded', function(data, cb)
         type = 'UPDATE_CONFIG',
         config = {
             Position = Config.Chat.Position,
-            AnnouncementDuration = Config.Announcement.Duration
+            AnnouncementDuration = Config.Announcement.Duration,
+            Language = {
+                Available = Config.Language.Available,
+                Default = Config.Language.Default
+            }
         }
     })
     TriggerServerEvent('cdtChat:init')
@@ -337,6 +343,13 @@ RegisterNUICallback('saveSettings', function(data, cb)
     cb('ok')
 end)
 
+RegisterNUICallback('saveLanguage', function(data, cb)
+    if data.language then
+        TriggerServerEvent('cdtChat:saveLanguage', data.language)
+    end
+    cb('ok')
+end)
+
 RegisterNetEvent('cdtChat:settingsLoaded')
 AddEventHandler('cdtChat:settingsLoaded', function(zoneId, settings)
     SendNUIMessage({
@@ -346,20 +359,32 @@ AddEventHandler('cdtChat:settingsLoaded', function(zoneId, settings)
     })
 end)
 
+RegisterNetEvent('cdtChat:languageLoaded')
+AddEventHandler('cdtChat:languageLoaded', function(language)
+    SendNUIMessage({
+        type = 'LOAD_LANGUAGE',
+        language = language
+    })
+end)
+
 RegisterNUICallback('toggleServerPrint', function(data, cb)
     showServerPrint = data.enabled
+    TriggerServerEvent('cdtChat:toggleSystemMessages', data.enabled)
     cb('ok')
 end)
 
 RegisterKeyMapping('cdt_chat_toggle', 'Afficher/Cacher le chat', 'keyboard', Config.Chat.OpenKey)
 
 RegisterCommand('cdt_chat_toggle', function()
+    local lang = Config.Language.Default
+    local msgs = Config.Messages[lang] or Config.Messages.fr
+    
     if not chatActive then
         TriggerServerEvent('cdtChat:checkMuteStatus')
         Wait(100)
         if isMuted then
             TriggerEvent('chat:addMessage', {
-                args = {'SYSTEM', 'Vous êtes mute pour ' .. muteTimeRemaining .. ' secondes encore'}
+                args = {'SYSTEM', string.format(msgs.MuteNotification, muteTimeRemaining)}
             })
             return
         end
@@ -386,6 +411,29 @@ AddEventHandler('__cfx_internal:serverPrint', function(msg)
             isCommand = false
         })
     end
+end)
+
+RegisterNetEvent('cdtChat:systemMessage')
+AddEventHandler('cdtChat:systemMessage', function(data)
+    if isAdmin and showServerPrint and Config.SystemMessages.ShowInAdminChat then
+        local msgType = data.type or 'info'
+        local typeConfig = Config.SystemMessages.Types[msgType]
+        
+        if typeConfig then
+            local prefix = '[' .. string.upper(msgType) .. ']'
+            SendNUIMessage({
+                type = 'ADD_MESSAGE',
+                message = prefix .. ' ' .. data.text,
+                isCommand = false
+            })
+        end
+    end
+end)
+
+RegisterNetEvent('cdtChat:updateSystemMessagesStatus')
+AddEventHandler('cdtChat:updateSystemMessagesStatus', function(enabled)
+    showServerPrint = enabled
+    localStorage = localStorage or {}
 end)
 
 RegisterCommand('adminchat', function()
