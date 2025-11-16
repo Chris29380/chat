@@ -192,6 +192,9 @@ RegisterNUICallback('chatResult', function(data, cb)
     if data.canceled then
         chatActive = false
         SetNuiFocus(false, false)
+        SendNUIMessage({
+            type = 'CLOSE'
+        })
         cb('ok')
         return
     end

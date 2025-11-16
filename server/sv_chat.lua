@@ -154,7 +154,7 @@ if GetResourceState('oxmysql') == 'started' then
                     INDEX(player_id),
                     INDEX(identifier),
                     INDEX(muted_until)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ]],
             [[
                 CREATE TABLE IF NOT EXISTS chat_history (
@@ -167,7 +167,7 @@ if GetResourceState('oxmysql') == 'started' then
                     INDEX(player_id),
                     INDEX(identifier),
                     INDEX(created_at)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ]],
             [[
                 CREATE TABLE IF NOT EXISTS chat_zone_settings (
@@ -185,7 +185,7 @@ if GetResourceState('oxmysql') == 'started' then
                     UNIQUE KEY unique_player_zone (identifier, zone_id),
                     INDEX(identifier),
                     INDEX(zone_id)
-                )
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ]],
             [[
                 CREATE TABLE IF NOT EXISTS player_settings (
@@ -196,27 +196,12 @@ if GetResourceState('oxmysql') == 'started' then
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX(identifier),
                     INDEX(language)
-                )
-            ]],
-            [[
-                ALTER TABLE chat_history ADD COLUMN IF NOT EXISTS identifier VARCHAR(100) AFTER player_id
-            ]],
-            [[
-                ALTER TABLE chat_history ADD INDEX IF NOT EXISTS idx_identifier (identifier)
-            ]],
-            [[
-                ALTER TABLE player_mutes ADD COLUMN IF NOT EXISTS identifier VARCHAR(100) AFTER player_id
-            ]],
-            [[
-                ALTER TABLE player_mutes ADD UNIQUE INDEX IF NOT EXISTS idx_identifier_unique (identifier)
-            ]],
-            [[
-                ALTER TABLE player_mutes DROP INDEX IF EXISTS player_id
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ]]
         }
         
         for _, query in ipairs(queries) do
-            exports.oxmysql:query_async(query, {}, function(result) end)
+            exports.oxmysql:execute(query, {}, function(result) end)
         end
         
         print('^2[Chat] Database initialized successfully^7')
@@ -235,7 +220,7 @@ local function mutePlayer(playerId, duration, reason, mutedByName)
     if GetResourceState('oxmysql') == 'started' then
         local identifier = GetPlayerIdentifiers(playerId)[1] or 'unknown'
         local mutedUntil = os.time() + (duration * 60)
-        exports.oxmysql:query_async('INSERT INTO player_mutes (player_id, identifier, muted_until, muted_by, reason) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE player_id = ?, muted_until = ?, muted_by = ?, reason = ?, muted_at = NOW()', 
+        exports.oxmysql:execute('INSERT INTO player_mutes (player_id, identifier, muted_until, muted_by, reason) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE player_id = ?, muted_until = ?, muted_by = ?, reason = ?, muted_at = NOW()', 
             {playerId, identifier, mutedUntil, mutedByName, reason, playerId, mutedUntil, mutedByName, reason}, function() end)
     end
 end
@@ -243,19 +228,20 @@ end
 local function unmutePlayer(playerId)
     if GetResourceState('oxmysql') == 'started' then
         local identifier = GetPlayerIdentifiers(playerId)[1] or 'unknown'
-        exports.oxmysql:query_async('DELETE FROM player_mutes WHERE identifier = ?', {identifier}, function() end)
+        exports.oxmysql:execute('DELETE FROM player_mutes WHERE identifier = ?', {identifier}, function() end)
     end
 end
 
 local function getPlayerMuteStatus(playerId, callback)
     if GetResourceState('oxmysql') == 'started' then
         local identifier = GetPlayerIdentifiers(playerId)[1] or 'unknown'
-        local res = exports.oxmysql:query_async('SELECT * FROM player_mutes WHERE identifier = ? AND muted_until > ?', {identifier, os.time()})
-        if res and #res > 0 then
-            callback(true, res[1].muted_until - os.time())
-        else
-            callback(false, 0)
-        end
+        exports.oxmysql:fetch('SELECT * FROM player_mutes WHERE identifier = ? AND muted_until > ?', {identifier, os.time()}, function(result)
+            if result and result[1] then
+                callback(true, result[1].muted_until - os.time())
+            else
+                callback(false, 0)
+            end
+        end)
     else
         callback(false, 0)
     end
@@ -264,7 +250,7 @@ end
 local function addMessageToHistory(playerId, playerName, message)
     if GetResourceState('oxmysql') == 'started' then
         local identifier = GetPlayerIdentifiers(playerId)[1] or 'unknown'
-        exports.oxmysql:query_async('INSERT INTO chat_history (player_id, identifier, player_name, message) VALUES (?, ?, ?, ?)', 
+        exports.oxmysql:execute('INSERT INTO chat_history (player_id, identifier, player_name, message) VALUES (?, ?, ?, ?)', 
             {playerId, identifier, playerName, message}, function() end)
     end
 end
@@ -272,10 +258,11 @@ end
 local function getPlayerHistory(playerId, limit, callback)
     if GetResourceState('oxmysql') == 'started' then
         print('^3[DB] Querying history for player ' .. playerId .. '^7')
-        local result = exports.oxmysql:query_async('SELECT * FROM chat_history WHERE player_id = ? ORDER BY created_at DESC LIMIT ?', 
-            {playerId, limit or Config.Database.History.Limit})
-        print('^3[DB] Got result for player ' .. playerId .. ' with ' .. (result and #result or 0) .. ' results^7')
-        callback(result or {})
+        exports.oxmysql:fetch('SELECT * FROM chat_history WHERE player_id = ? ORDER BY created_at DESC LIMIT ?', 
+            {playerId, limit or Config.Database.History.Limit}, function(result)
+            print('^3[DB] Got result for player ' .. playerId .. ' with ' .. (result and #result or 0) .. ' results^7')
+            callback(result or {})
+        end)
     else
         print('^1[DB] oxmysql not started^7')
         callback({})
@@ -285,10 +272,11 @@ end
 local function getPlayerHistoryByIdentifier(identifier, limit, callback)
     if GetResourceState('oxmysql') == 'started' then
         print('^3[DB] Querying history for identifier ' .. identifier .. '^7')
-        local result = exports.oxmysql:query_async('SELECT * FROM chat_history WHERE identifier = ? ORDER BY created_at DESC LIMIT ?', 
-            {identifier, limit or Config.Database.History.Limit})
-        print('^3[DB] Got result for identifier ' .. identifier .. ' with ' .. (result and #result or 0) .. ' results^7')
-        callback(result or {})
+        exports.oxmysql:fetch('SELECT * FROM chat_history WHERE identifier = ? ORDER BY created_at DESC LIMIT ?', 
+            {identifier, limit or Config.Database.History.Limit}, function(result)
+            print('^3[DB] Got result for identifier ' .. identifier .. ' with ' .. (result and #result or 0) .. ' results^7')
+            callback(result or {})
+        end)
     else
         print('^1[DB] oxmysql not started^7')
         callback({})
